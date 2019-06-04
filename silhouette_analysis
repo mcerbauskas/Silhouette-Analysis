@@ -1,0 +1,127 @@
+1  from sklearn.feature_extraction.text import TfidfVectorizer
+2  
+3  # open and read from the txt file
+4  path = "C:/Users/marius.cerbauskas/Desktop/article1.txt"
+5  file = open(path, 'r')
+6  sentences = file.readlines()
+7  
+8  from textblob import TextBlob
+9  
+10 def textblob_tokenizer(str_input):
+11     blob = TextBlob(str_input.lower())
+12     tokens = blob.words
+13     words = [token.stem() for token in tokens]
+14     return words
+15 
+16 data = sentences
+17 
+18 tf_vectorizer = TfidfVectorizer(tokenizer=textblob_tokenizer,
+19                       stop_words='english',
+20                       norm='l2', # l2 – euclidean distance which is by default
+21                       use_idf=True, # by default its true
+22                       )
+23 # .todense() returns a matrix, otherwise we could use .toarray()
+24 tf_matrix = tf_vectorizer.fit_transform(data).todense()
+25 X = tf_matrix
+26 
+27 import pandas as pd
+28 # # can print this out to see the matrix
+29 # with pd.option_context('display.max_rows', 13, 'display.max_columns', 800):
+30 #     print(X)
+31 
+32 from sklearn.decomposition import PCA
+33 pca = PCA(n_components=2).fit(X)
+34 data2D = pca.transform(X)
+35 
+36 import matplotlib.cm as cm
+37 from sklearn.metrics import silhouette_samples, silhouette_score
+38 import matplotlib.pyplot as plt
+39 
+40 range_n_clusters = [2, 3, 4, 5, 6]
+41 
+42 for num_clusters in range_n_clusters:
+43     # Create a subplot with 1 row and 2 columns
+44     fig, (ax1, ax2) = plt.subplots(1, 2)
+45     fig.set_size_inches(18, 7)
+46 
+47     # The 1st subplot is the silhouette plot
+48     # The silhouette coefficient can range from –1, 1 but in this example all
+49     # lie within [–0.1, 1]
+50     ax1.set_xlim([–0.1, 1])
+51     # The (n_clusters+1)*10 is for inserting blank space between silhouette
+52     # plots of individual clusters, to demarcate them clearly.
+53     ax1.set_ylim([0, len(data2D) + (num_clusters + 1) * 10])
+54 
+55     from sklearn.cluster import KMeans
+56 
+57     km = KMeans(n_clusters=num_clusters,
+58             n_init=10,                        # number of iterations with different seeds
+59             random_state=10                   # fixes the seed
+60            )
+61 
+62     cluster_labels = km.fit_predict(data2D)
+63     # The silhouette_score gives the average value for all the samples.
+64     # This gives a perspective into the density and separation of the formed
+65     # clusters
+66     silhouette_avg = silhouette_score(data2D, cluster_labels)
+67     print("Esant branduoliu skaiciui =", num_clusters,
+68             "Vidutine Silhouette koeficiento reiksme yra :", silhouette_avg)
+69 
+70     # Compute the silhouette scores for each sample
+71     sample_silhouette_values = silhouette_samples(data2D, cluster_labels)
+72 
+73     import numpy as np
+74 
+75     y_lower = 10
+76     for i in range(num_clusters):
+77         #   Aggregate the silhouette scores for samples belonging to
+78         #    cluster i, and sort them
+79         ith_cluster_silhouette_values = \
+80             sample_silhouette_values[cluster_labels == i]
+81 
+82         ith_cluster_silhouette_values.sort()
+83 
+84         size_cluster_i = ith_cluster_silhouette_values.shape[0]
+85         y_upper = y_lower + size_cluster_i
+86 
+87         color = cm.nipy_spectral(float(i) / num_clusters)
+88         ax1.fill_betweenx(np.arange(y_lower, y_upper),
+89                         0, ith_cluster_silhouette_values,
+90                         facecolor=color, edgecolor=color, alpha=0.7)
+91 
+92         # Label the silhouette plots with their cluster numbers at the middle
+93         ax1.text(–0.05, y_lower + 0.5 * size_cluster_i, str(i))
+94 
+95         # Compute the new y_lower for next plot
+96         y_lower = y_upper + 10  # 10 for the 0 samples
+97 
+98     ax1.set_title("Silhouette metodo diagrama ivairiems branduoliams.")
+99     ax1.set_xlabel("Koeficientu reiksmes")
+100    ax1.set_ylabel("Branduolio skaicius")
+101
+102    # The vertical line for average silhouette score of all the values
+103    ax1.axvline(x=silhouette_avg, color="red", linestyle="––")
+104
+105    ax1.set_yticks([])  # Clear the yaxis labels / ticks
+106    ax1.set_xticks([–0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+107
+108    # 2nd Plot showing the actual clusters formed
+109    colors = cm.nipy_spectral(cluster_labels.astype(float) / num_clusters)
+110    ax2.scatter(data2D[:, 0], data2D[:, 1], marker='.', s=30, lw=0, alpha=0.7, c=colors, edgecolor='k')
+111
+112    # Labeling the clusters
+113    centers = km.cluster_centers_
+114    # Draw white circles at cluster centers
+115    ax2.scatter(centers[:, 0], centers[:, 1], marker='o', c="white", alpha=1, s=200, edgecolor='k')
+116
+117    for i, c in enumerate(centers):
+118        ax2.scatter(c[0], c[1], marker='$%d$' % i, alpha=1, s=50, edgecolor='k')
+119
+120    ax2.set_title("Klasterizuotu duomenu vizualizacija.")
+121    ax2.set_xlabel("X")
+122    ax2.set_ylabel("Y")
+123
+124    plt.suptitle(("Silhouette metodo analize KMeans duomenu klasterizavimui, kai branduoliu skaicius "
+125                  "= %d" % num_clusters), fontsize=14, fontweight='bold')
+126
+127 plt.show()
